@@ -4,6 +4,10 @@ import numpy as np
 import base64
 from io import BytesIO
 from PIL import Image
+from tensorflow.keras.models import load_model
+
+# segmentation_model = load_model(path)
+# type_model = load_model(path)
 
 def base64_to_image(string):
     file = string.strip()
@@ -86,3 +90,26 @@ def preprocess_image(string):
     # S = hsv[:,:,1]
 
     return HS
+
+def image_to_base64(image):
+    image = Image.fromarray(preprocess_image(image))
+    
+    ## Convert Image to passable base64 string
+    image_io = BytesIO()
+    image.save(image_io, format='JPEG')
+    image_bytes = image_io.getvalue()
+    image64 = base64.b64encode(image_bytes).decode("ascii")
+    return image64
+
+def get_acidity_moisture(image64):
+    image = base64_to_image(image64)
+    # acidity, moisture = segmentation_model(image)
+    acidity = -1
+    moisture = -1
+    return acidity, moisture
+
+def get_type(image64):
+    classes = ['clay','silt','sand']
+    # type_ = classes[np.argmax(type_model(image))]
+    type_ = -1
+    return type_

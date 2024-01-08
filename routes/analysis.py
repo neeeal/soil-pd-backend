@@ -1,6 +1,8 @@
-from flask import jsonify, Blueprint, request
-from controllers.analysis_methods import preprocess_image
+from flask import jsonify, Blueprint, request, send_file    
+from controllers.analysis_methods import image_to_base64, get_acidity_moisture, get_type
+from PIL import Image
 import base64
+from io import BytesIO
 
 analysis_bp = Blueprint('analysis',__name__)
 
@@ -16,9 +18,20 @@ def soil_analysis():
     if request.method == 'POST' and DATA:
         try: DATA['image'] = DATA['image'].split(',')[1]
         except: pass
-        image = preprocess_image(DATA['image'])
-        image64 = str(base64.b64encode(image))
-        #### handle base64 passing of image as response
+        image64 = image_to_base64(DATA['image'])
+        acidity, moisture = get_acidity_moisture(image64)
+        type_ = get_type(DATA['image'])
+        nitrogen = -1
+        phosporus = -1
+        potassium = -1
         msg = 'Successfully extracted soil properties from image'
-        return jsonify({'msg':msg, 'processed_image':image64}), 200
+        response = jsonify({'msg':msg, 'image64':image64, 
+            'soil_properties':{'acidity':acidity,
+                               'moisture':moisture,
+                               'type_':type_,
+                               'nitrogen':nitrogen,
+                               'phosporus':phosporus,
+                               'potassium':potassium,}})
+        response.headers['Content-Type'] = 'application/json'
+        return response, 200
     return jsonify({'msg':msg}), 401
