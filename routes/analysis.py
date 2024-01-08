@@ -1,8 +1,5 @@
 from flask import jsonify, Blueprint, request, send_file    
 from controllers.analysis_methods import image_to_base64, get_acidity_moisture, get_type
-from PIL import Image
-import base64
-from io import BytesIO
 
 analysis_bp = Blueprint('analysis',__name__)
 
@@ -24,8 +21,11 @@ def soil_analysis():
         nitrogen = -1
         phosporus = -1
         potassium = -1
+        longitude = -1
+        latitude = -1
         msg = 'Successfully extracted soil properties from image'
         response = jsonify({'msg':msg, 'image64':image64, 
+            'location':{'longitude':longitude, 'latitude':latitude},
             'soil_properties':{'acidity':acidity,
                                'moisture':moisture,
                                'type_':type_,
