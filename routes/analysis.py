@@ -26,8 +26,8 @@ def soil_analysis():
         nitrogen = -1
         phosporus = -1
         potassium = -1
-        longitude = -1
-        latitude = -1
+        latitude = 14.625983543082867
+        longitude = 121.0617254517838
         # mapId = -1
         userId = -1
         robotId = -1
