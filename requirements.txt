@@ -11,4 +11,4 @@ opencv-python-headless
 gdown
 pymysql
 Pillow
-dotenv
+python-dotenv
