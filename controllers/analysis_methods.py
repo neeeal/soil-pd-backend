@@ -8,6 +8,7 @@ from tensorflow.keras.models import load_model
 from tensorflow import convert_to_tensor
 import gdown
 import os
+from db import db
 
 if os.path.isdir("models/")==False:
     url = 'https://drive.google.com/drive/folders/17ZMgOMgJCRv-ZDTVphei6AMa5Kc22yEr'
@@ -99,3 +100,17 @@ def get_type(image64):
     # type_ = classes[np.argmax(type_model(image))]
     type_ = -1
     return type_
+
+def get_maps(userId):
+    db.ping(reconnect=True)
+    with db.cursor() as cursor:
+        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId}")
+        data = cursor.fetchall()
+    for x in range(len(data)):
+        image = Image.frombytes("RGB", (64, 64), data[x]['image']) 
+        image_io = BytesIO()
+        image.save(image_io, format='JPEG')
+        image_bytes = image_io.getvalue()
+        data[x]['image'] = base64.b64encode(image_bytes).decode("ascii") 
+    db.commit()
+    return data
