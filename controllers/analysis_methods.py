@@ -11,9 +11,9 @@ import os
 from db import db
 
 if os.path.isdir("models")==False:
-    url = 'https://drive.google.com/drive/folders/17ZMgOMgJCRv-ZDTVphei6AMa5Kc22yEr'
+    url = 'https://drive.google.com/drive/folders/18pLHbLUET48X18AUhSAj4DxJqVhQBKSR'
     gdown.download_folder(url, quiet=True, use_cookies=False)
-print(os.path.isdir("models")) 
+print(os.path.isdir("models/designB.h5")) 
 segmentation_model=load_model(filepath='models/designB.h5')
 # segmentation_model = load_model(path)
 # type_model = load_model(path)
