@@ -62,4 +62,7 @@ def soil_analysis():
 def get_analysis():
     userId = request.get_json()['userId']
     data = get_maps(userId)
-    return data
+    if data!=None:
+        response = jsonify({"msg":"Succesfully Retrieved", "analysis":data})
+        return response, 200
+    return jsonify({"msg":"Client Error"}),400
