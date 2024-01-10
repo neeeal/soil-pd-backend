@@ -13,7 +13,7 @@ from db import db
 if os.path.isdir("models")==False:
     url = 'https://drive.google.com/drive/folders/17ZMgOMgJCRv-ZDTVphei6AMa5Kc22yEr'
     gdown.download_folder(url, quiet=True, use_cookies=False)
-    
+print(os.path.isdir("models")) 
 segmentation_model=load_model(filepath='models/designB.h5')
 # segmentation_model = load_model(path)
 # type_model = load_model(path)
