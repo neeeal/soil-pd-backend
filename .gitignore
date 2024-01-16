@@ -1,4 +1,10 @@
-models
+models/
+models_/
+my_models/
+type_data.7z
+type_data/
+jpgData_/ 
+*.h5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
