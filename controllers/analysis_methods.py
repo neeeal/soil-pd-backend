@@ -10,13 +10,12 @@ import gdown
 import os
 from db import db
 
-if os.path.isdir("models")==False:
-    url = 'https://drive.google.com/drive/folders/18pLHbLUET48X18AUhSAj4DxJqVhQBKSR'
-    gdown.download_folder(url, quiet=True, use_cookies=False)
-print(os.path.isdir("models/designB.h5")) 
-segmentation_model=load_model(filepath='models/designB.h5')
-# segmentation_model = load_model(path)
-# type_model = load_model(path)
+if os.path.isdir("my_models")==False:
+    id = '1GjnZR4W1LEK8V-ExjXB2lVGzW0z1ZymC'
+    gdown.download_folder(id=id, quiet=True, use_cookies=False)
+print(os.path.isdir("my_models/designB.h5")) 
+segmentation_model = load_model(filepath='my_models/designB.h5')
+type_model = load_model('my_models/type_model.h5')
 
 def base64_to_image(string):
     file = string.strip()
@@ -97,6 +96,9 @@ def get_acidity_moisture(image64):
 
 def get_type(image64):
     classes = ['clay','silt','sand']
+    image = base64_to_image(image64).reshape((1,75,75,3))
+    print(image.shape)
+    type_ = str(type_model.predict(image)[0][0])
     # type_ = classes[np.argmax(type_model(image))]
     type_ = -1
     return type_
