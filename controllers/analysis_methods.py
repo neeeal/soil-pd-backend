@@ -10,9 +10,9 @@ import gdown
 import os
 from db import db
 
-if os.path.isdir("my_models")==False:
-    id = '1GjnZR4W1LEK8V-ExjXB2lVGzW0z1ZymC'
-    gdown.download_folder(id=id, quiet=True, use_cookies=False)
+if os.path.exists("designB.hb")==False:
+    LINK = os.getenv("DRIVE_LINK")
+    gdown.download_folder(LINK, quiet=True, use_cookies=False)
 print(os.path.isdir("my_models/designB.h5")) 
 segmentation_model = load_model(filepath='my_models/designB.h5')
 type_model = load_model('my_models/type_model.h5')
@@ -95,12 +95,13 @@ def get_acidity_moisture(image64):
     return acidity, moisture
 
 def get_type(image64):
-    classes = ['clay','silt','sand']
-    image = base64_to_image(image64).reshape((1,75,75,3))
+    # {'clay': 0, 'sand': 1, 'silt': 2}
+    classes = ['clay','sand','silt']
+    image = cv2.resize(base64_to_image(image64),(75,75)).reshape((1,75,75,3))
     print(image.shape)
-    type_ = str(type_model.predict(image)[0][0])
-    # type_ = classes[np.argmax(type_model(image))]
-    type_ = -1
+    type_ = type_model.predict(image)
+    type_ = classes[np.argmax(type_)]
+    print(type_)
     return type_
 
 def get_maps(userId):
