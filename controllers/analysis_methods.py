@@ -10,7 +10,7 @@ import gdown
 import os
 from db import db
 
-if os.path.exists("designB.hb")==False:
+if os.path.exists("my_models")==False:
     LINK = os.getenv("DRIVE_LINK")
     gdown.download_folder(LINK, quiet=True, use_cookies=False)
 print(os.path.isdir("my_models/designB.h5")) 
@@ -86,7 +86,7 @@ def image_to_base64(image):
     return image64
 
 def get_acidity_moisture(image64):
-    image = preprocess_image(image64).reshape((1,32,32,3))
+    image = preprocess_image(image64).reshape((1,32,32,3))/255.
     print(image.shape)
     acidity = str(segmentation_model.predict(image)[0][0])
     print(acidity)
@@ -97,7 +97,7 @@ def get_acidity_moisture(image64):
 def get_type(image64):
     # {'clay': 0, 'sand': 1, 'silt': 2}
     classes = ['clay','sand','silt']
-    image = cv2.resize(base64_to_image(image64),(75,75)).reshape((1,75,75,3))
+    image = cv2.resize(base64_to_image(image64),(75,75)).reshape((1,75,75,3))/255.
     print(image.shape)
     type_ = type_model.predict(image)
     type_ = classes[np.argmax(type_)]
