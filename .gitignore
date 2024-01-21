@@ -5,6 +5,10 @@ type_data.7z
 type_data/
 jpgData_/ 
 *.h5
+close_seg_/
+df/
+my_dir/
+design_models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
