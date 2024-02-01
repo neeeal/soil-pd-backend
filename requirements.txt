@@ -12,3 +12,8 @@ gdown==4.6.0
 pymysql
 Pillow
 python-dotenv
+rembg
+opencv-python
+numpy==1.23.5
+numba
+matplotlib
