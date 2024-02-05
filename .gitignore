@@ -9,6 +9,7 @@ close_seg_/
 df/
 my_dir/
 design_models/
+preprocessingData/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
