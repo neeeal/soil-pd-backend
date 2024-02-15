@@ -13,7 +13,7 @@ def index():
     msg = 'Welcome to Analysis Route'
     return jsonify({'msg': msg}),200
 
-@analysis_bp.route('/soil_analysis', methods=["POST"])
+@analysis_bp.route('/store', methods=["POST"])
 def soil_analysis():
     DATA = request.get_json()
     msg = 'No Image Data Provided'
@@ -58,7 +58,7 @@ def soil_analysis():
         return response, 200
     return jsonify({'msg':msg}), 401
 
-@analysis_bp.route('/get_analysis', methods=["GET"])
+@analysis_bp.route('/get', methods=["GET"])
 def get_analysis():
     userId = request.get_json()['userId']
     data = get_maps(userId)
