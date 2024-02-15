@@ -13,9 +13,11 @@ from db import db
 if os.path.exists("my_models")==False:
     LINK = os.getenv("DRIVE_LINK")
     gdown.download_folder(LINK, quiet=True, use_cookies=False)
+    print("Downloading model")
 print(os.path.isdir("my_models/designB.h5")) 
 segmentation_model = load_model(filepath='my_models/designB.h5')
 type_model = load_model('my_models/type_model.h5')
+print("Loaded models")
 
 def base64_to_image(string):
     file = string.strip()
