@@ -106,16 +106,86 @@ def get_type(image64):
     print(type_)
     return type_
 
+def remote_store(DATA):
+    try: DATA['image'] = DATA['image'].split(',')[1]
+    except: pass
+    image = cv2.resize(base64_to_image(DATA['image']),(64,64)).tobytes()
+    acidity, moisture = get_acidity_moisture(DATA['image'])
+    type_ = get_type(DATA['image'])
+    nitrogen = -1
+    phosporus = -1
+    potassium = -1
+    latitude = 14.625983543082867
+    longitude = 121.0617254517838
+    # mapId = -1
+    userId = -1
+    robotId = -1
+    db.ping(reconnect=True)
+    with db.cursor() as cursor:
+        # print("working")
+        sql = """INSERT INTO `analysis` (`userId`, 
+        `latitude`, `longitude`, `nitrogen`, `phosphorus`, 
+        `potassium`, `moisture`, `acidity`, `type`, image) 
+        VALUES (%s, %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s
+                )"""
+        cursor.execute(sql, (userId, latitude, 
+                                longitude, nitrogen, phosporus, 
+                                potassium, moisture, acidity, 
+                                type_, image))
+    db.commit()
+    msg = 'Successfully extracted soil properties from image'
+    return msg
+
 def get_maps(userId):
     db.ping(reconnect=True)
     with db.cursor() as cursor:
         cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId}")
         data = cursor.fetchall()
+        # print(len(data))
+    db.commit()
     for x in range(len(data)):
+        # print(data[x]['image'])
+        # print(data[x]['mapId'])
+        if(data[x]["image"]==b'none'): 
+            # print("wporking")
+            data[x]['image'] = base64.b64encode(data[x]["image"]).decode("ascii")
+            continue
         image = Image.frombytes("RGB", (64, 64), data[x]['image']) 
         image_io = BytesIO()
         image.save(image_io, format='JPEG')
         image_bytes = image_io.getvalue()
-        data[x]['image'] = base64.b64encode(image_bytes).decode("ascii") 
+        data[x]['image'] = base64.b64encode(image_bytes).decode("ascii")
+    # print("finished")
+    return data
+
+def store(userId, data):
+    ## function to add entry from client side
+    # print(data['longitude'])
+    db.ping(reconnect=True)
+    with db.cursor() as cursor:
+        sql = """INSERT INTO `analysis` (`userId`, 
+                `latitude`, `longitude`, 
+                `nitrogen`, `phosphorus`, 
+                `potassium`, `moisture`, 
+                `acidity`, `type`, 
+                `image`) 
+                VALUES (%s, %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s
+                )"""
+        cursor.execute(sql, (userId,
+                             data['latitude'], data['longitude'], 
+                             data['nitrogen'], data['phosphorus'], 
+                             data['potassium'], data['moisture'], 
+                             data['acidity'], data['soilType'],
+                             data['image']))
     db.commit()
     return data
+
+def update(recordId):
+    ## function to update entry from client side
+    return
+
+def delete(recordId):
+    ## function to delete entry from client side
+    return
