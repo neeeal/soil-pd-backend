@@ -9,6 +9,7 @@ from tensorflow import convert_to_tensor
 import gdown
 import os
 from db import db
+import datetime
 
 if os.path.exists("my_models")==False:
     LINK = os.getenv("DRIVE_LINK")
@@ -18,6 +19,9 @@ print(os.path.isdir("my_models/designB.h5"))
 segmentation_model = load_model(filepath='my_models/designB.h5')
 type_model = load_model('my_models/type_model.h5')
 print("Loaded models")
+
+def generatedId(lat,lon):
+    return
 
 def base64_to_image(string):
     file = string.strip()
@@ -120,16 +124,18 @@ def remote_store(DATA):
     # mapId = -1
     userId = -1
     robotId = -1
+    mapId = generatedId(14.700407062019375,121.03216730474672)
     db.ping(reconnect=True)
     with db.cursor() as cursor:
         # print("working")
-        sql = """INSERT INTO `analysis` (`userId`, 
+        sql = """INSERT INTO `analysis` (`mapId`,`userId`, 
         `latitude`, `longitude`, `nitrogen`, `phosphorus`, 
         `potassium`, `moisture`, `acidity`, `type`, image) 
         VALUES (%s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s,
+                %s
                 )"""
-        cursor.execute(sql, (userId, latitude, 
+        cursor.execute(sql, (mapId, userId, latitude, 
                                 longitude, nitrogen, phosporus, 
                                 potassium, moisture, acidity, 
                                 type_, image))
@@ -140,7 +146,7 @@ def remote_store(DATA):
 def get_maps(userId):
     db.ping(reconnect=True)
     with db.cursor() as cursor:
-        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId}")
+        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId} AND `dateDeleted` IS NULL")
         data = cursor.fetchall()
         # print(len(data))
     db.commit()
@@ -162,30 +168,38 @@ def get_maps(userId):
 def store(userId, data):
     ## function to add entry from client side
     # print(data['longitude'])
+    print(data['mapId'])
     db.ping(reconnect=True)
     with db.cursor() as cursor:
-        sql = """INSERT INTO `analysis` (`userId`, 
+        sql = """INSERT INTO `analysis` (`mapId`, `userId`, 
                 `latitude`, `longitude`, 
                 `nitrogen`, `phosphorus`, 
                 `potassium`, `moisture`, 
                 `acidity`, `type`, 
                 `image`) 
                 VALUES (%s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s,
+                %s
                 )"""
-        cursor.execute(sql, (userId,
+        cursor.execute(sql, (data['mapId'], userId,
                              data['latitude'], data['longitude'], 
                              data['nitrogen'], data['phosphorus'], 
                              data['potassium'], data['moisture'], 
                              data['acidity'], data['soilType'],
                              data['image']))
     db.commit()
+    print(data)
     return data
 
 def update(recordId):
     ## function to update entry from client side
     return
 
-def delete(recordId):
+def delete(mapId):
     ## function to delete entry from client side
-    return
+    db.ping(reconnect=True)
+    with db.cursor() as cursor:
+        sql = "UPDATE `analysis` SET `dateDeleted` = '{}' WHERE `mapId` = '{}'".format(datetime.datetime.now(), mapId)
+        cursor.execute(sql)
+    db.commit()
+    return True

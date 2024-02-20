@@ -37,7 +37,7 @@ def get_analysis(userId):
     print("here")
     if data is not None:
         print("i am")
-        return jsonify({"msg": "Successfully Retrieved", "analysis": data, "ok": "true"}), 200
+        return jsonify({"msg": "Successfully Retrieved", "number_entries":len(data), "analysis": data, "ok": "true"}), 200
     else:
         print("playing")
         return jsonify({"msg": "No data found for the provided user ID", "ok": "false"}), 400
@@ -52,20 +52,21 @@ def store(userId):
         print(data)
         if data and userId:
             result = analysis_methods.store(userId, data)
+            print(result)
             return jsonify({"msg":"Succesfully stored data","data":result}), 200
         else:
             return jsonify({"msg":"Missing input fields."}), 400
     except Exception as e:
         return jsonify({"msg":"Server error", "error":e}), 500
 
-@analysis_bp.route('/update/<recordId>', methods=["PUT"])
-def update(recordId):
+@analysis_bp.route('/<mapId>', methods=["PUT"])
+def update(mapId):
     ## function to update entry from client side
     analysis_methods.update()
     return
 
-@analysis_bp.route('/delete/<recordId>', methods=["DELETE"])
-def delete(recordId):
+@analysis_bp.route('/<mapId>', methods=["DELETE"])
+def delete(mapId):
     ## function to delete entry from client side
-    analysis_methods.update()
-    return
+    result = analysis_methods.delete(mapId)
+    return jsonify({"msg":f"Sucessfully deleted entry mapId {mapId}"})
