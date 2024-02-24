@@ -191,15 +191,25 @@ def store(userId, data):
     print(data)
     return data
 
-def update(recordId):
+def update(mapId, data):
     ## function to update entry from client side
-    return
+    db.ping(reconnect=True)
+    # Construct the SQL statement
+    sql = "UPDATE `analysis` SET "
+    placeholders = ", ".join([f"`{key}` = %s" for key in data])
+    sql += placeholders + " WHERE `mapId` = %s"
+    values = list(data.values()) + [mapId]
+    with db.cursor() as cursor:
+        cursor.execute(sql, values)
+    db.commit()
+    return True
+
 
 def delete(mapId):
     ## function to delete entry from client side
     db.ping(reconnect=True)
     with db.cursor() as cursor:
-        sql = "UPDATE `analysis` SET `dateDeleted` = '{}' WHERE `mapId` = '{}'".format(datetime.datetime.now(), mapId)
-        cursor.execute(sql)
+        sql = "UPDATE `analysis` SET `dateDeleted` = %s WHERE `mapId` = %s"
+        cursor.execute(sql, (datetime.datetime.now(), mapId))
     db.commit()
     return True

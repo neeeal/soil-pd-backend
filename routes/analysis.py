@@ -59,11 +59,12 @@ def store(userId):
     except Exception as e:
         return jsonify({"msg":"Server error", "error":e}), 500
 
-@analysis_bp.route('/<mapId>', methods=["PUT"])
+@analysis_bp.route('/update/<mapId>', methods=["PUT"])
 def update(mapId):
     ## function to update entry from client side
-    analysis_methods.update()
-    return
+    data = request.json
+    result = analysis_methods.update(mapId, data)
+    return jsonify({"msg":f"Succesfully updated entry mapId {mapId}", "updates":data})
 
 @analysis_bp.route('/<mapId>', methods=["DELETE"])
 def delete(mapId):
