@@ -2,6 +2,7 @@ models/
 models_/
 my_models/
 type_data.7z
+ipynb/temp
 type_data/
 jpgData_/ 
 *.h5
