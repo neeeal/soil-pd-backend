@@ -35,7 +35,6 @@ def get_analysis(userId):
     else:
         print("playing")
         return jsonify({"msg": "No data found for the provided user ID", "ok": "false"}), 400
-    print("no data found")
     
 @analysis_bp.route('/store/<userId>', methods=["POST"])
 def store(userId):

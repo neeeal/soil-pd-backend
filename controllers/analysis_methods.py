@@ -177,26 +177,36 @@ def remote_store(DATA):
     }
     return data
 
-def get_maps(userId):
-    db.ping(reconnect=True)
+def get_maps(userId, order_by=1):
+    db.ping(reconnect=True)  # Assuming db is your database connection object
     with db.cursor() as cursor:
-        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId} AND `dateDeleted` IS NULL")
+        ORDER_BY = ''
+        if order_by == 1:
+            ORDER_BY = 'ASC'
+        elif order_by == 0:
+            ORDER_BY = 'DESC'
+        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId} AND `dateDeleted` IS NULL ORDER BY `mapId` {ORDER_BY}")
         data = cursor.fetchall()
-        # print(len(data))
+        
+        # Convert numeric values to float with 3 decimal places
+        for d in data:
+            for key, value in d.items():
+                if isinstance(value, (int, float)):
+                    d[key] = round(float(value), 3)
+
     db.commit()
+
     for x in range(len(data)):
-        # print(data[x]['image'])
-        # print(data[x]['mapId'])
-        if(data[x]["image"]==b'none'): 
-            # print("wporking")
+        if data[x]["image"] == b'none':
             data[x]['image'] = base64.b64encode(data[x]["image"]).decode("ascii")
             continue
+        # Convert binary image data to base64 encoded string
         image = Image.frombytes("RGB", (64, 64), data[x]['image']) 
         image_io = BytesIO()
         image.save(image_io, format='JPEG')
         image_bytes = image_io.getvalue()
         data[x]['image'] = base64.b64encode(image_bytes).decode("ascii")
-    # print("finished")
+
     return data
 
 def store(userId, data):
