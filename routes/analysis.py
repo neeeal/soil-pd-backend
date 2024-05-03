@@ -19,14 +19,8 @@ def remote_store():
     msg = 'No Image Data Provided'
     if request.method == 'POST' and DATA:
         data = analysis_methods.remote_store(DATA)
-        response = jsonify({'msg':msg, #'image64':image64, 
-            'location':{'longitude':data.longitude, 'latitude':data.latitude},
-            'soil_properties':{'acidity':data.acidity,
-                                'moisture':data.moisture,
-                                'type_':data.type_,
-                                'nitrogen':data.nitrogen,
-                                'phosporus':data.phosporus,
-                                'potassium':data.potassium,}})
+        msg = "Succesfully analyzed soil."
+        response = jsonify({'msg':msg, "data":data})
         response.headers['Content-Type'] = 'application/json'
         return response, 200
     return jsonify({'msg':msg}), 401

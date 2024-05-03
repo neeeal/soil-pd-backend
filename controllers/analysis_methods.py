@@ -8,17 +8,19 @@ from tensorflow.keras.models import load_model
 from tensorflow import convert_to_tensor
 import gdown
 import os
+import csv
 from db import db
 import datetime
+BASE_PATH = "ipynb\\models\\model_v3"
 
-if os.path.exists("my_models")==False:
-    LINK = os.getenv("DRIVE_LINK")
-    gdown.download_folder(LINK, quiet=True, use_cookies=False)
-    print("Downloading model")
-print(os.path.isdir("my_models/designB.h5")) 
-segmentation_model = load_model(filepath='my_models/designB.h5')
-type_model = load_model('my_models/type_model.h5')
-print("Loaded models")
+# if os.path.exists("my_models")==False:
+#     LINK = os.getenv("DRIVE_LINK")
+#     gdown.download_folder(LINK, quiet=True, use_cookies=False)
+#     print("Downloading model")
+# print(os.path.isdir("my_models/designB.h5")) 
+# segmentation_model = load_model(filepath='my_models/designB.h5')
+# type_model = load_model('my_models/type_model.h5')
+# print("Loaded models")
 
 def generatedId(lat,lon):
     return
@@ -35,51 +37,53 @@ def base64_to_image(string):
     data = np.array(pil_image)
     return data
 
+def get_mask(image):
+    image = image.astype(np.uint8)
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+    binr = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    binr = np.invert(binr)
+
+    kernel = np.ones((3, 3), np.uint8)
+    mask = cv2.erode(binr, kernel, iterations=3)
+    
+    return mask
+
 def preprocess_image(string):
     # Load image
     img = base64_to_image(string)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     orig_img = img.copy()
+    rgb_image = orig_img.astype(np.uint8)
 
-    gray = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2GRAY)
-    # Threshold Processing
-    ret, bin_img = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    # Noise removal
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel, iterations=7)
-    bin_img = cv2.dilate(bin_img, kernel, iterations=5)
-    # Distance transform
-    dist = cv2.distanceTransform(bin_img, cv2.DIST_L2, 5)
-    # Foreground area
-    ret, sure_fg = cv2.threshold(dist, 0.5 * dist.max(), 255, cv2.THRESH_BINARY)
-    sure_fg = sure_fg.astype(np.uint8)
+    mask = get_mask(rgb_image)
+    output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask)
 
-    new_image_size=32
-    # Apply the mask to the original image to extract the region
-    region = cv2.bitwise_and(orig_img, orig_img, mask=sure_fg)
-    # Find the bounding box coordinates (non-zero pixels)
-    non_zero_coords = np.argwhere(region > 0)
-    min_y, min_x, _ = non_zero_coords.min(axis=0)
-    max_y, max_x, _ = non_zero_coords.max(axis=0)
-    # Crop the region to include only non-zero pixels
-    cropped_region = region[min_y:max_y + 1, min_x:max_x + 1]
-
-    rgb_planes = cv2.split(cropped_region)
+    rgb_planes = cv2.split(output)
     result_planes = []
-    # Create a CLAHE object.
-    clahe = cv2.createCLAHE(tileGridSize=(3,3),clipLimit=10)
     for plane in rgb_planes:
-        processed_image = cv2.medianBlur(plane, 7)
-        processed_image = clahe.apply(processed_image) 
+        processed_image = cv2.medianBlur(plane, 3)
         result_planes.append(processed_image)
     result = cv2.merge(result_planes)
+    result = cv2.resize(result, (32, 32))
+    return result
 
-    HSV = cv2.cvtColor(result,cv2.COLOR_RGB2HSV)
-    HSV = cv2.resize(HSV, (new_image_size, new_image_size))
-    H,S,V = cv2.split(HSV)
-    V *= 0
-    HS = cv2.merge([H,S,V])
-    return HS
+def load_limits(path):
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        next(reader)
+        MINPH = float(next(reader)[1])
+        MAXPH = float(next(reader)[1])
+        MINMOISTURE = float(next(reader)[1])
+        MAXMOISTURE = float(next(reader)[1])
+            
+    return { 'MINPH':MINPH,  'MAXPH':MAXPH , 'MINMOISTURE':MINMOISTURE , 'MAXMOISTURE':MAXMOISTURE }
+
+def unprocess_label(label, maxPh, minPh, maxMoisture, minMoisture):
+    moisture = np.array(label[0::2], dtype=float) * (float(maxMoisture) - float(minMoisture)) + float(minMoisture)
+    ph = np.array(label[1::2], dtype=float) * (float(maxPh) - float(minPh)) + float(minPh)
+    output = [moisture, ph]
+    return output
 
 def image_to_base64(image):
     image = Image.fromarray(preprocess_image(image))
@@ -91,57 +95,87 @@ def image_to_base64(image):
     image64 = base64.b64encode(image_bytes).decode("ascii")
     return image64
 
+# MODEL = load_model(os.path.join(BASE_PATH,'model_v1.h5'))
+# Correct way to unpack a dictionary
+limits = load_limits(os.path.join(BASE_PATH,'limits.csv'))
+MINPH = limits['MINPH']
+MAXPH = limits['MAXPH']
+MINMOISTURE = limits['MINMOISTURE']
+MAXMOISTURE = limits['MAXMOISTURE']
+
+segmentation_model = None
+def init_model(path):
+    global segmentation_model
+    if segmentation_model is None:
+        segmentation_model = load_model(filepath=path)
+        return segmentation_model
+    
 def get_acidity_moisture(image64):
+    global segmentation_model
+    init_model(os.path.join(BASE_PATH,'model_v3.h5'))
+
     image = preprocess_image(image64).reshape((1,32,32,3))/255.
     print(image.shape)
-    acidity = str(segmentation_model.predict(image)[0][0])
-    print(acidity)
-    # acidity = -1
-    moisture = -1
-    return acidity, moisture
+    result = (segmentation_model.predict(image)[0])
+    processed_result = unprocess_label(result,MINPH, MAXPH, MINMOISTURE, MAXMOISTURE)
+    finalMoisture = np.mean(processed_result[0])
+    finalPh = np.mean(processed_result[1])
+    return {"moisture": finalMoisture, "acidity": finalPh}
 
-def get_type(image64):
-    # {'clay': 0, 'sand': 1, 'silt': 2}
-    classes = ['clay','sand','silt']
-    image = cv2.resize(base64_to_image(image64),(75,75)).reshape((1,75,75,3))/255.
-    print(image.shape)
-    type_ = type_model.predict(image)
-    type_ = classes[np.argmax(type_)]
-    print(type_)
-    return type_
+# def get_type(image64):
+#     # {'clay': 0, 'sand': 1, 'silt': 2}
+#     classes = ['clay','sand','silt']
+#     image = cv2.resize(base64_to_image(image64),(75,75)).reshape((1,75,75,3))/255.
+#     print(image.shape)
+#     type_ = type_model.predict(image)
+#     type_ = classes[np.argmax(type_)]
+#     print(type_)
+#     return type_
 
 def remote_store(DATA):
     try: DATA['image'] = DATA['image'].split(',')[1]
     except: pass
     image = cv2.resize(base64_to_image(DATA['image']),(64,64)).tobytes()
-    acidity, moisture = get_acidity_moisture(DATA['image'])
-    type_ = get_type(DATA['image'])
-    nitrogen = -1
-    phosporus = -1
-    potassium = -1
-    latitude = 14.625983543082867
-    longitude = 121.0617254517838
+    result = get_acidity_moisture(DATA['image'])
+    moisture = result['moisture']
+    acidity = result['acidity']
+    nitrogen = DATA['nitrogen']
+    phosphorus = DATA['phosphorus']
+    potassium = DATA['potassium']
+    latitude = DATA['latitude']
+    longitude = DATA['longitude']
     # mapId = -1
     userId = -1
     robotId = -1
-    mapId = generatedId(14.700407062019375,121.03216730474672)
+    # mapId = generatedId(14.700407062019375,121.03216730474672)
     db.ping(reconnect=True)
     with db.cursor() as cursor:
         # print("working")
-        sql = """INSERT INTO `analysis` (`mapId`,`userId`, 
+        sql = """INSERT INTO `analysis` (`userId`, 
         `latitude`, `longitude`, `nitrogen`, `phosphorus`, 
-        `potassium`, `moisture`, `acidity`, `type`, image) 
-        VALUES (%s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s,
-                %s
+        `potassium`, `moisture`, `acidity`, image) 
+        VALUES (%s, 
+                %s, %s, %s, %s, 
+                %s, %s, %s, %s
                 )"""
-        cursor.execute(sql, (mapId, userId, latitude, 
-                                longitude, nitrogen, phosporus, 
-                                potassium, moisture, acidity, 
-                                type_, image))
+        cursor.execute(sql, (userId, 
+                             latitude, longitude, nitrogen, phosphorus, 
+                             potassium, moisture, acidity, image
+                             ))
+        entry = cursor.execute("SELECT * FROM `analysis` WHERE `userId` = %s ORDER BY `mapId` DESC LIMIT 1" % userId)
     db.commit()
-    msg = 'Successfully extracted soil properties from image'
-    return msg
+    print(entry)
+    data = {
+        "userId":userId, 
+        "latitude":latitude, 
+        "longitude":longitude, 
+        "nitrogen":nitrogen, 
+        "phosphorus":phosphorus, 
+        "potassium":potassium, 
+        "moisture":moisture, 
+        "acidity":acidity, 
+    }
+    return data
 
 def get_maps(userId):
     db.ping(reconnect=True)
@@ -175,18 +209,19 @@ def store(userId, data):
                 `latitude`, `longitude`, 
                 `nitrogen`, `phosphorus`, 
                 `potassium`, `moisture`, 
-                `acidity`, `type`, 
-                `image`) 
-                VALUES (%s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s,
-                %s
+                `acidity`, `image`) 
+                VALUES (
+                    %s, %s, 
+                    %s, %s, 
+                    %s, %s, 
+                    %s, %s, 
+                    %s, %s
                 )"""
         cursor.execute(sql, (data['mapId'], userId,
                              data['latitude'], data['longitude'], 
                              data['nitrogen'], data['phosphorus'], 
                              data['potassium'], data['moisture'], 
-                             data['acidity'], data['soilType'],
-                             data['image']))
+                             data['acidity'], data['image']))
     db.commit()
     print(data)
     return data
