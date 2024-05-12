@@ -177,7 +177,7 @@ def remote_store(DATA):
     }
     return data
 
-def get_maps(userId, order_by=1):
+def get_maps(userId, order_by=0):
     db.ping(reconnect=True)  # Assuming db is your database connection object
     with db.cursor() as cursor:
         ORDER_BY = ''
