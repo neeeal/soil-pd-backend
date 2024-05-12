@@ -27,13 +27,18 @@ def remote_store():
 
 @analysis_bp.route('/<userId>', methods=["GET"])
 def get_analysis(userId):
-    data = analysis_methods.get_maps(userId)
-    print("here")
-    if data is not None:
-        print("i am")
-        return jsonify({"msg": "Successfully Retrieved", "number_entries":len(data), "analysis": data, "ok": "true"}), 200
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 10, type=int)
+    data = analysis_methods.get_maps(userId, page=page, limit=limit)
+    
+    if data is not None:  # Check if data is not None instead of if data
+        return jsonify({
+            "msg": "Successfully Retrieved",
+            "number_entries": len(data),
+            "analysis": data,
+            "ok": "true"
+        }), 200
     else:
-        print("playing")
         return jsonify({"msg": "No data found for the provided user ID", "ok": "false"}), 400
     
 @analysis_bp.route('/store/<userId>', methods=["POST"])

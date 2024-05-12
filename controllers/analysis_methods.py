@@ -177,15 +177,18 @@ def remote_store(DATA):
     }
     return data
 
-def get_maps(userId, order_by=0):
-    db.ping(reconnect=True)  # Assuming db is your database connection object
+def get_maps(userId, order_by=0, page=1, limit=10):
+    db.ping(reconnect=True)
+    offset = (page - 1) * limit
+    ORDER_BY = 'DESC' if order_by == 0 else 'ASC'
+    
     with db.cursor() as cursor:
-        ORDER_BY = ''
-        if order_by == 1:
-            ORDER_BY = 'ASC'
-        elif order_by == 0:
-            ORDER_BY = 'DESC'
-        cursor.execute(f"SELECT * FROM `analysis` WHERE `userId` = {userId} AND `dateDeleted` IS NULL ORDER BY `mapId` {ORDER_BY}")
+        cursor.execute(f"""
+            SELECT * FROM `analysis` 
+            WHERE `userId` = %s AND `dateDeleted` IS NULL 
+            ORDER BY `mapId` {ORDER_BY} 
+            LIMIT %s OFFSET %s
+        """, (userId, limit, offset))
         data = cursor.fetchall()
         
         # Convert numeric values to float with 3 decimal places
