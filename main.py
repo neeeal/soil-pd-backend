@@ -20,6 +20,10 @@ app.register_blueprint(user_bp, url_prefix='/api/user')
 if __name__ == '__main__':
     app.run(
         debug=True, 
-        host = os.getenv('API_HOST', default='localhost'), 
+        host = os.getenv(
+            'API_HOST',
+            # default='64.224.130.63' 
+            default='localhost'
+            ), 
         port=os.getenv("PORT", default=5000))
     print("APP RUNNING ...")
