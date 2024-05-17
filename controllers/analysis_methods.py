@@ -10,8 +10,11 @@ import gdown
 import os
 import csv
 from db import db
+import requests
 import datetime
 BASE_PATH = "ipynb\\models\\model_v3"
+
+GEOLOCATION_API_KEY = os.getenv("GEOLOCATION_API_KEY")
 
 # if os.path.exists("my_models")==False:
 #     LINK = os.getenv("DRIVE_LINK")
@@ -209,6 +212,12 @@ def get_maps(userId, order_by=0, page=1, limit=10):
         image.save(image_io, format='JPEG')
         image_bytes = image_io.getvalue()
         data[x]['image'] = base64.b64encode(image_bytes).decode("ascii")
+        temp = [x["formatted_address"] if type(x)==dict else None for x in requests.get("https://maps.googleapis.com/maps/api/geocode/json?latlng={},{}&key={}".format(
+            data[x]['latitude'],
+            data[x]['longitude'],
+            GEOLOCATION_API_KEY
+        )).json()["results"]]
+        data[x]['address'] = temp[0] if len(temp)>0 else None
 
     return data
 
