@@ -218,6 +218,8 @@ def get_maps(userId, order_by=0, page=1, limit=10):
             GEOLOCATION_API_KEY
         )).json()["results"]]
         data[x]['address'] = temp[0] if len(temp)>0 else None
+        interpretations = interpret(data[x])
+        data[x]['interpretations'] = interpretations
 
     return data
 
@@ -270,3 +272,55 @@ def delete(mapId):
         cursor.execute(sql, (datetime.datetime.now(), mapId))
     db.commit()
     return True
+
+def interpret(data):
+    interpretations = {}
+    acidity = ['acidic', 'neutral', 'basic']
+    nitrogen = ['high nitrogen', 'normal nitrogen', 'low nitrogen']
+    phosphorus = ['high phosphorus', 'normal phosphorus',' low phosphorus']
+    potassium = ['high potassium', 'normal potassium', 'low potassium']
+    moisture = ['high moisture', 'normal moisture', 'low moisture']
+    
+    if data["acidity"] < 7:
+        acidity_arg = 2
+    elif data["acidity"] == 7:
+        acidity_arg = 1
+    else:
+        acidity_arg = 0
+    
+    if data["nitrogen"] < 7:
+        nitrogen_arg = 2
+    elif data["nitrogen"] == 7:
+        nitrogen_arg = 1
+    else:
+        nitrogen_arg = 0
+    
+    if data["phosphorus"] < 7:
+        phosphorus_arg = 2
+    elif data["phosphorus"] == 7:
+        phosphorus_arg = 1
+    else:
+        phosphorus_arg = 0
+    
+    if data["potassium"] < 7:
+        potassium_arg = 2
+    elif data["potassium"] == 7:
+        potassium_arg = 1
+    else:
+        potassium_arg = 0
+    
+    if data["moisture"] < 7:
+        moisture_arg = 2
+    elif data["moisture"] == 7:
+        moisture_arg = 1
+    else:
+        moisture_arg = 0
+    
+    interpretations ={
+        "acidity": acidity[acidity_arg],
+        "nitrogen": nitrogen[nitrogen_arg],
+        "phosphorus": phosphorus[phosphorus_arg],
+        "potassium": potassium[potassium_arg],
+        "moisture": moisture[moisture_arg],
+    }
+    return interpretations
