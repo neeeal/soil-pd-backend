@@ -275,18 +275,18 @@ def delete(mapId):
 
 def interpret(data):
     interpretations = {}
-    acidity = ['acidic', 'neutral', 'basic']
-    nitrogen = ['high nitrogen', 'normal nitrogen', 'low nitrogen']
-    phosphorus = ['high phosphorus', 'normal phosphorus',' low phosphorus']
-    potassium = ['high potassium', 'normal potassium', 'low potassium']
-    moisture = ['high moisture', 'normal moisture', 'low moisture']
+    acidity = ['acidic', 'neutral', 'alkaline']
+    nitrogen = ['high', 'normal', 'low']
+    phosphorus = ['high', 'normal',' low']
+    potassium = ['high', 'normal', 'low']
+    moisture = ['high', 'normal', 'low']
     
     if data["acidity"] < 7:
-        acidity_arg = 2
-    elif data["acidity"] == 7:
+        acidity_arg = 0
+    elif data["acidity"] >= 7 and data["acidity"] < 8:
         acidity_arg = 1
     else:
-        acidity_arg = 0
+        acidity_arg = 2
     
     if data["nitrogen"] < 7:
         nitrogen_arg = 2
@@ -309,12 +309,12 @@ def interpret(data):
     else:
         potassium_arg = 0
     
-    if data["moisture"] < 7:
-        moisture_arg = 2
-    elif data["moisture"] == 7:
+    if data["moisture"] < 0.25:
+        moisture_arg = 0
+    elif data["moisture"] >= 0.17 and data["moisture"] <= 0.22:
         moisture_arg = 1
     else:
-        moisture_arg = 0
+        moisture_arg = 2
     
     interpretations ={
         "acidity": acidity[acidity_arg],
