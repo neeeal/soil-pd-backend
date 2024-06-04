@@ -8,7 +8,7 @@ jpgData_/
 *.h5
 close_seg_/
 df/
-my_dir/
+my_dir*
 design_models/
 preprocessingData/
 
