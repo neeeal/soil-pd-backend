@@ -12,9 +12,10 @@ import csv
 from db import db
 import requests
 import datetime
-BASE_PATH = "ipynb\\models\\model_v3"
+BASE_PATH = "ipynb\\models\\model_v7"
 
 GEOLOCATION_API_KEY = os.getenv("GEOLOCATION_API_KEY")
+IMAGE_SIZE = 32
 
 # if os.path.exists("my_models")==False:
 #     LINK = os.getenv("DRIVE_LINK")
@@ -58,17 +59,16 @@ def preprocess_image(string):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     orig_img = img.copy()
     rgb_image = orig_img.astype(np.uint8)
-
+    rgb_image = cv2.resize(rgb_image, (IMAGE_SIZE, IMAGE_SIZE))
     mask = get_mask(rgb_image)
-    output = cv2.bitwise_and(rgb_image, rgb_image, mask=mask)
 
-    rgb_planes = cv2.split(output)
+    rgb_planes = cv2.split(rgb_image)
     result_planes = []
     for plane in rgb_planes:
         processed_image = cv2.medianBlur(plane, 3)
+        processed_image = cv2.bitwise_and(processed_image, processed_image, mask=mask)
         result_planes.append(processed_image)
     result = cv2.merge(result_planes)
-    result = cv2.resize(result, (32, 32))
     return result
 
 def load_limits(path):
@@ -82,11 +82,23 @@ def load_limits(path):
             
     return { 'MINPH':MINPH,  'MAXPH':MAXPH , 'MINMOISTURE':MINMOISTURE , 'MAXMOISTURE':MAXMOISTURE }
 
+def mask_labels(mask, label):
+    channel_0 = cv2.bitwise_and(label[:,:,0], label[:,:,0], mask=mask)
+    channel_1 = cv2.bitwise_and(label[:,:,1], label[:,:,1], mask=mask)
+    return cv2.merge([channel_0, channel_1])
+
 def unprocess_label(label, maxPh, minPh, maxMoisture, minMoisture):
     moisture = np.array(label[0::2], dtype=float) * (float(maxMoisture) - float(minMoisture)) + float(minMoisture)
     ph = np.array(label[1::2], dtype=float) * (float(maxPh) - float(minPh)) + float(minPh)
-    output = [moisture, ph]
+    output = [np.mean(moisture), np.mean(ph)]
     return output
+
+def unprocess_label_wmask(image,label):
+    unnormalized = image*255
+    MASK = np.array(get_mask(unnormalized))
+    mask_label = mask_labels(MASK, np.array(label))
+    results = unprocess_label(label, MAXPH, MINPH, MAXMOISTURE, MINMOISTURE)
+    return results
 
 def image_to_base64(image):
     image = Image.fromarray(preprocess_image(image))
@@ -115,14 +127,14 @@ def init_model(path):
     
 def get_acidity_moisture(image64):
     global segmentation_model
-    init_model(os.path.join(BASE_PATH,'model_v3.h5'))
+    init_model(os.path.join(BASE_PATH,'designB_v7.h5'))
 
-    image = preprocess_image(image64).reshape((1,32,32,3))/255.
+    image = preprocess_image(image64).reshape((1,IMAGE_SIZE,IMAGE_SIZE,3))/255.
     print(image.shape)
     result = (segmentation_model.predict(image)[0])
-    processed_result = unprocess_label(result,MINPH, MAXPH, MINMOISTURE, MAXMOISTURE)
-    finalMoisture = np.mean(processed_result[0])
-    finalPh = np.mean(processed_result[1])
+    processed_result = unprocess_label_wmask(image[0],result)
+    finalMoisture = processed_result[0]
+    finalPh = processed_result[1]
     return {"moisture": finalMoisture, "acidity": finalPh}
 
 # def get_type(image64):
@@ -138,7 +150,7 @@ def get_acidity_moisture(image64):
 def remote_store(DATA):
     try: DATA['image'] = DATA['image'].split(',')[1]
     except: pass
-    image = cv2.resize(base64_to_image(DATA['image']),(64,64)).tobytes()
+    image = cv2.resize(base64_to_image(DATA['image']),(IMAGE_SIZE,IMAGE_SIZE)).tobytes()
     result = get_acidity_moisture(DATA['image'])
     moisture = result['moisture']
     acidity = result['acidity']
@@ -207,7 +219,7 @@ def get_maps(userId, order_by=0, page=1, limit=10):
             data[x]['image'] = base64.b64encode(data[x]["image"]).decode("ascii")
             continue
         # Convert binary image data to base64 encoded string
-        image = Image.frombytes("RGB", (64, 64), data[x]['image']) 
+        image = Image.frombytes("RGB", (IMAGE_SIZE, IMAGE_SIZE), data[x]['image']) 
         image_io = BytesIO()
         image.save(image_io, format='JPEG')
         image_bytes = image_io.getvalue()
