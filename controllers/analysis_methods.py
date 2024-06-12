@@ -10,12 +10,12 @@ import gdown
 import os
 import csv
 from db import db
+import matplotlib.pyplot as plt
 import requests
 import datetime
-BASE_PATH = "ipynb\\models\\model_v7"
+BASE_PATH = "ipynb\\models\\model_v8"
 
 GEOLOCATION_API_KEY = os.getenv("GEOLOCATION_API_KEY")
-IMAGE_SIZE = 32
 
 # if os.path.exists("my_models")==False:
 #     LINK = os.getenv("DRIVE_LINK")
@@ -44,24 +44,25 @@ def base64_to_image(string):
 def get_mask(image):
     image = image.astype(np.uint8)
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-
-    binr = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    binr = cv2.threshold(gray, 16, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     binr = np.invert(binr)
-
     kernel = np.ones((3, 3), np.uint8)
-    mask = cv2.erode(binr, kernel, iterations=3)
-    
+    mask = cv2.erode(binr, kernel, iterations=2)
+    mask = (mask // 255).astype(np.uint8)
     return mask
 
-def preprocess_image(string):
+def preprocess_image(image):
     # Load image
-    img = base64_to_image(string)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    orig_img = img.copy()
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    orig_img = image.copy()
     rgb_image = orig_img.astype(np.uint8)
-    rgb_image = cv2.resize(rgb_image, (IMAGE_SIZE, IMAGE_SIZE))
-    mask = get_mask(rgb_image)
 
+    gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
+    binr = cv2.threshold(gray, 16, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    binr = np.invert(binr)
+    kernel = np.ones((3, 3), np.uint8)
+    mask = cv2.erode(binr, kernel, iterations=2)
+    mask = (mask // 255).astype(np.uint8)
     rgb_planes = cv2.split(rgb_image)
     result_planes = []
     for plane in rgb_planes:
@@ -79,29 +80,48 @@ def load_limits(path):
         MAXPH = float(next(reader)[1])
         MINMOISTURE = float(next(reader)[1])
         MAXMOISTURE = float(next(reader)[1])
-            
     return { 'MINPH':MINPH,  'MAXPH':MAXPH , 'MINMOISTURE':MINMOISTURE , 'MAXMOISTURE':MAXMOISTURE }
 
 def mask_labels(mask, label):
-    channel_0 = cv2.bitwise_and(label[:,:,0], label[:,:,0], mask=mask)
-    channel_1 = cv2.bitwise_and(label[:,:,1], label[:,:,1], mask=mask)
-    return cv2.merge([channel_0, channel_1])
+    channel_0 = cv2.bitwise_and(label[:, :, 0], label[:, :, 0], mask=mask)
+    channel_1 = cv2.bitwise_and(label[:, :, 1], label[:, :, 1], mask=mask)
+    return [channel_0, channel_1]
 
 def unprocess_label(label, maxPh, minPh, maxMoisture, minMoisture):
-    moisture = np.array(label[0::2], dtype=float) * (float(maxMoisture) - float(minMoisture)) + float(minMoisture)
-    ph = np.array(label[1::2], dtype=float) * (float(maxPh) - float(minPh)) + float(minPh)
-    output = [np.mean(moisture), np.mean(ph)]
-    return output
+    # Convert label to float and flatten the arrays
+    label = np.array(label, dtype=float)
+    label_0_flat = label[0].flatten()
+    label_1_flat = label[1].flatten()
+
+    # Filter out zero values
+    filtered_label_0 = label_0_flat[label_0_flat != 0]
+    filtered_label_1 = label_1_flat[label_1_flat != 0]
+
+    # Unnormalize the values
+    moisture = filtered_label_0/10 #* (float(maxMoisture) - float(minMoisture)) + float(minMoisture)
+    ph = filtered_label_1 #* (float(maxPh) - float(minPh)) + float(minPh)
+
+    # Return the mean values of moisture and pH
+    return [np.mean(moisture), np.mean(ph)]
 
 def unprocess_label_wmask(image,label):
-    unnormalized = image*255
-    MASK = np.array(get_mask(unnormalized))
-    mask_label = mask_labels(MASK, np.array(label))
-    results = unprocess_label(label, MAXPH, MINPH, MAXMOISTURE, MINMOISTURE)
+    def make_mask(image):
+        image = np.array(image, dtype=np.uint8)
+        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        mask = (gray > 0).astype(np.uint8)
+        return mask
+
+    unnormalized_image = np.array(image * 255).astype(np.uint8)
+    
+    mask = make_mask(unnormalized_image)
+
+    masked_labels = mask_labels(mask, np.array(label))
+
+    results = unprocess_label(masked_labels, MAXPH, MINPH, MAXMOISTURE, MINMOISTURE)
     return results
 
 def image_to_base64(image):
-    image = Image.fromarray(preprocess_image(image))
+    image = Image.fromarray(image)
     
     ## Convert Image to passable base64 string
     image_io = BytesIO()
@@ -127,14 +147,18 @@ def init_model(path):
     
 def get_acidity_moisture(image64):
     global segmentation_model
-    init_model(os.path.join(BASE_PATH,'designB_v7.h5'))
+    init_model(os.path.join(BASE_PATH,'designB_v8.h5'))
 
-    image = preprocess_image(image64).reshape((1,IMAGE_SIZE,IMAGE_SIZE,3))/255.
-    print(image.shape)
-    result = (segmentation_model.predict(image)[0])
-    processed_result = unprocess_label_wmask(image[0],result)
-    finalMoisture = processed_result[0]
-    finalPh = processed_result[1]
+    image = cv2.resize(base64_to_image(image64),(64, 64))
+    normalized_image = preprocess_image(image).reshape((1,64,64,3))/255.
+    # for i in normalized_image[0]:
+    #     print(i)
+    result = (segmentation_model.predict(normalized_image)[0])
+    print(result.shape)
+    processed_result = unprocess_label_wmask(image, result)
+    print(processed_result)
+    finalMoisture = np.mean(processed_result[0])
+    finalPh = np.mean(processed_result[1])
     return {"moisture": finalMoisture, "acidity": finalPh}
 
 # def get_type(image64):
@@ -150,7 +174,7 @@ def get_acidity_moisture(image64):
 def remote_store(DATA):
     try: DATA['image'] = DATA['image'].split(',')[1]
     except: pass
-    image = cv2.resize(base64_to_image(DATA['image']),(IMAGE_SIZE,IMAGE_SIZE)).tobytes()
+    image = cv2.resize(base64_to_image(DATA['image']),(128,128)).tobytes()
     result = get_acidity_moisture(DATA['image'])
     moisture = result['moisture']
     acidity = result['acidity']
@@ -219,7 +243,7 @@ def get_maps(userId, order_by=0, page=1, limit=10):
             data[x]['image'] = base64.b64encode(data[x]["image"]).decode("ascii")
             continue
         # Convert binary image data to base64 encoded string
-        image = Image.frombytes("RGB", (IMAGE_SIZE, IMAGE_SIZE), data[x]['image']) 
+        image = Image.frombytes("RGB", (64, 64), data[x]['image']) 
         image_io = BytesIO()
         image.save(image_io, format='JPEG')
         image_bytes = image_io.getvalue()
@@ -287,52 +311,58 @@ def delete(mapId):
 
 def interpret(data):
     interpretations = {}
-    acidity = ['acidic', 'neutral', 'alkaline']
-    nitrogen = ['high', 'normal', 'low']
-    phosphorus = ['high', 'normal',' low']
-    potassium = ['high', 'normal', 'low']
-    moisture = ['high', 'normal', 'low']
     
     if data["acidity"] < 7:
-        acidity_arg = 0
+        acidity_arg = "Acidic"
     elif data["acidity"] >= 7 and data["acidity"] < 8:
-        acidity_arg = 1
+        acidity_arg = "Neutral"
     else:
-        acidity_arg = 2
+        acidity_arg = "Alkaline"
     
-    if data["nitrogen"] < 7:
-        nitrogen_arg = 2
-    elif data["nitrogen"] == 7:
-        nitrogen_arg = 1
+    if data["nitrogen"] >= 0 and data["nitrogen"] <= 127:
+        phosphorus_arg = "Low"
+    elif data["nitrogen"] >= 108 and data["nitrogen"] <= 214:
+        phosphorus_arg = "Medium"
+    elif data["nitrogen"] >= 215 and data["nitrogen"] <= 250:
+        phosphorus_arg = "High"
     else:
-        nitrogen_arg = 0
+        nitrogen_arg = "Very High"
     
-    if data["phosphorus"] < 7:
-        phosphorus_arg = 2
-    elif data["phosphorus"] == 7:
-        phosphorus_arg = 1
+    if data["phosphorus"] >= 0 and data["phosphorus"] <= 5:
+        phosphorus_arg = "Low"
+    elif data["phosphorus"] >= 6 and data["phosphorus"] <= 12:
+        phosphorus_arg = "Moderately Low"
+    elif data["phosphorus"] >= 13 and data["phosphorus"] <= 25:
+        phosphorus_arg = "Moderately High"
+    elif data["phosphorus"] >= 26 and data["phosphorus"] <= 50:
+        phosphorus_arg = "High"
     else:
-        phosphorus_arg = 0
+        phosphorus_arg = "Very High"
     
-    if data["potassium"] < 7:
-        potassium_arg = 2
-    elif data["potassium"] == 7:
-        potassium_arg = 1
+    if data["potassium"] >= 0 and data["potassium"] <= 75:
+        potassium_arg = "Low"
+    elif  data["potassium"] >= 76 and data["potassium"] <= 113:
+        potassium_arg = "Sufficient"
+    elif  data["potassium"] >= 114 and data["potassium"] <= 150:
+        potassium_arg = "Sufficient+"
+    elif  data["potassium"] >= 151 and data["potassium"] <= 250:
+        potassium_arg = "Sufficient++"
     else:
-        potassium_arg = 0
+        potassium_arg = "Sufficient+++"
     
-    if data["moisture"] < 0.25:
-        moisture_arg = 0
-    elif data["moisture"] >= 0.17 and data["moisture"] <= 0.22:
-        moisture_arg = 1
+    if data["moisture"] <= 0.25:
+        texture_arg = "Sandy"
+    elif data["moisture"] > 0.25 and data["moisture"] <= 0.45:
+        texture_arg = "Loam"
     else:
-        moisture_arg = 2
+        texture_arg = "Clay"
     
     interpretations ={
-        "acidity": acidity[acidity_arg],
-        "nitrogen": nitrogen[nitrogen_arg],
-        "phosphorus": phosphorus[phosphorus_arg],
-        "potassium": potassium[potassium_arg],
-        "moisture": moisture[moisture_arg],
+        "acidity": acidity_arg,
+        "nitrogen": nitrogen_arg,
+        "phosphorus": phosphorus_arg,
+        "potassium": potassium_arg,
+        "moisture": "",
+        "Texture": textire_arg
     }
     return interpretations
