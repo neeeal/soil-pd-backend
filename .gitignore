@@ -9,8 +9,9 @@ jpgData_/
 close_seg_/
 df/
 my_dir*
-design_models/
+design_models*
 preprocessingData/
+Images*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
