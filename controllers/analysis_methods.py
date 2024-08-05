@@ -15,7 +15,7 @@ import requests
 import random
 import datetime
 
-BASE_PATH = "ipynb\\design_models_v2\\designB_v16"
+BASE_PATH = "ipynb\\design_models_v2"
 GEOLOCATION_API_KEY = os.getenv("GEOLOCATION_API_KEY")
 
 # if os.path.exists("my_models")==False:
@@ -249,7 +249,7 @@ def init_model(path):
     
 def get_acidity_moisture(image64):
     global segmentation_model
-    init_model(os.path.join(BASE_PATH,'designB_v0.h5'))
+    init_model(os.path.join(BASE_PATH,'designB_vfinal2.h5'))
 
     image = cv2.resize(image64,(64, 64))
     normalized_image = preprocess_image(image).reshape((1,64,64,3))/255.
